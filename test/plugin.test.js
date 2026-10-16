@@ -80,6 +80,28 @@ function fakeHost({ title = '修复登录崩溃', summary = '改了三个文件�
         { type: 'turn/end', seq, time: 1_700_000_000_000, data: { turn: 1, reason } },
       );
     },
+    /**
+     * Drive one recorded tool call, the way the host records it.
+     *
+     * `arguments` is the raw JSON **string** the model streamed: the session
+     * log stores `block.arguments` verbatim, before the dispatcher parses it.
+     * Handing this harness a ready-made object would let a plugin that forgot
+     * to parse pass every test while staying silent in production — which is
+     * precisely what happened. So this stringifies by default, and `raw`
+     * overrides it for malformed-input cases.
+     */
+    toolCall(name, args, { origin, raw } = {}) {
+      const payload = raw !== undefined ? raw : args === undefined ? undefined : JSON.stringify(args);
+      handlers.get('session/event')(
+        { id: SESSION_ID, header: { id: SESSION_ID, cwd: CWD, ...(origin === undefined ? {} : { origin }) } },
+        {
+          type: 'tool/call',
+          seq: 3,
+          time: 1_700_000_000_000,
+          data: { turn: 1, step: 1, callId: 'call-1', name, arguments: payload },
+        },
+      );
+    },
     /** Drive one agent status transition. */
     status(status) {
       handlers.get('agent/status')({ agent: { id: SESSION_ID }, status }, { id: SESSION_ID });
@@ -240,8 +262,27 @@ test('a failure carries its message into the body', async () => {
   host.dispose();
 });
 
+/**
+ * A goal view shaped the way the host actually returns one.
+ *
+ * `@deepseek-ai/dsh-goal`'s `GoalService.view()` spreads the goal flat, so the
+ * phase lives at `view.phase` and there is no nested `view.goal.status`. These
+ * fixtures previously used `{ goal: { status } }`, a shape no host produces: the
+ * assertions passed green while the real integration read `undefined` and
+ * announced every round of a running goal. Keep this faithful.
+ */
+const goalView = (phase) => ({
+  id: 'goal-1',
+  revision: 1,
+  objective: '修复登录崩溃',
+  phase,
+  maxGoalRounds: 256,
+  roundsStarted: 1,
+  activation: 'armed',
+});
+
 test('a goal suppresses its own rounds and announces its settlement instead', async () => {
-  const goals = new Map([[SESSION_ID, { goal: { status: 'active' } }]]);
+  const goals = new Map([[SESSION_ID, goalView('active')]]);
   const host = fakeHost({ goals });
   const transport = recordingTransport();
   apply(host, { settleDelayMs: settle }, transport);
@@ -257,7 +298,7 @@ test('a goal suppresses its own rounds and announces its settlement instead', as
   assert.deepEqual(transport.shown, [], 'rounds of a live goal stay silent');
 
   // The goal is met; the round driver stops and the agent goes idle.
-  goals.set(SESSION_ID, { goal: { status: 'complete' } });
+  goals.set(SESSION_ID, goalView('complete'));
   host.turnEnd(99, { kind: 'completed' });
   host.status('idle');
   await tick(settle + 20);
@@ -269,7 +310,7 @@ test('a goal suppresses its own rounds and announces its settlement instead', as
 });
 
 test('a running goal that stops for a person is announced', async () => {
-  const goals = new Map([[SESSION_ID, { goal: { status: 'active' } }]]);
+  const goals = new Map([[SESSION_ID, goalView('active')]]);
   const host = fakeHost({ goals });
   const transport = recordingTransport();
   apply(host, { settleDelayMs: settle }, transport);
@@ -402,4 +443,145 @@ test('disposing a session cancels an announcement that has not fired', async () 
   await tick(60);
 
   assert.deepEqual(transport.shown, []);
+});
+
+// A question is the case the turn-end machinery structurally cannot see:
+// `ask_user_question` waits inside the step, so the turn never ends while a
+// person is being waited on. These tests pin the separate path that covers it.
+test('a question is announced at once, with no turn end involved', async () => {
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { settleDelayMs: settle }, transport);
+
+  host.status('running');
+  host.toolCall('ask_user_question', {
+    questions: [{ id: 'db', question: '你要用哪个数据库？' }],
+  });
+  await tick(20);
+
+  // No turnEnd and no idle transition in this test on purpose: if the
+  // announcement depended on either, nothing would be shown.
+  assert.equal(transport.shown.length, 1);
+  assert.equal(transport.shown[0].title, '❓ 修复登录崩溃');
+  assert.equal(transport.shown[0].sound, 'Reminder');
+  assert.match(transport.shown[0].body, /你要用哪个数据库？/);
+  host.dispose();
+});
+
+test('a question is not delayed by the settle window', async () => {
+  // The settle delay exists to coalesce rounds of one task; making someone wait
+  // on it while the agent is blocked on them would be the wrong trade.
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { settleDelayMs: 5_000 }, transport);
+
+  host.toolCall('ask_user_question', { questions: [{ id: 'q', question: '继续吗？' }] });
+  await tick(30);
+
+  assert.equal(transport.shown.length, 1);
+  host.dispose();
+});
+
+test('ordinary tool calls are never announced', async () => {
+  // The failure this guards: hooking `tool/call` and forgetting to filter by
+  // tool name would put a toast on screen for every call the model makes.
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { settleDelayMs: settle }, transport);
+
+  host.status('running');
+  for (const [name, args] of [
+    ['pwsh', { command: 'ls' }],
+    ['read', { file_path: 'a.txt' }],
+    ['subagent', { prompt: 'go' }],
+    ['ask_user_question_extra', { questions: [{ question: 'not the tool' }] }],
+  ]) {
+    host.toolCall(name, args);
+  }
+  await tick(20);
+
+  assert.deepEqual(transport.shown, []);
+  host.dispose();
+});
+
+test('notifyOn never silences a question', async () => {
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { notifyOn: 'never', settleDelayMs: settle }, transport);
+
+  host.toolCall('ask_user_question', { questions: [{ id: 'q', question: '继续吗？' }] });
+  await tick(20);
+
+  assert.deepEqual(transport.shown, []);
+  host.dispose();
+});
+
+test('a question in a subagent session stays silent', async () => {
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { settleDelayMs: settle }, transport);
+
+  host.toolCall('ask_user_question', { questions: [{ id: 'q', question: '继续吗？' }] }, { origin: 'subagent' });
+  await tick(20);
+
+  assert.deepEqual(transport.shown, []);
+  host.dispose();
+});
+
+test('a question call with no usable text is not announced', async () => {
+  // `arguments` is model-authored JSON; a malformed call must stay quiet rather
+  // than put "undefined" in a toast.
+  for (const args of [undefined, {}, { questions: [] }, { questions: [{}] }]) {
+    const host = fakeHost();
+    const transport = recordingTransport();
+    apply(host, { settleDelayMs: settle }, transport);
+
+    host.toolCall('ask_user_question', args);
+    await tick(20);
+
+    assert.deepEqual(transport.shown, [], `args=${JSON.stringify(args)}`);
+    host.dispose();
+  }
+});
+
+test('an unparseable arguments string stays silent', async () => {
+  // The host records the streamed string verbatim, so a truncated one reaches
+  // here intact. JSON.parse throws on it; that must not become a toast, and
+  // must not escape as an unhandled error inside the agent loop either.
+  for (const raw of ['{"questions":[{"id":"q",', '', '   ', 'null', '"a string"', '42']) {
+    const host = fakeHost();
+    const transport = recordingTransport();
+    apply(host, { settleDelayMs: settle }, transport);
+
+    host.toolCall('ask_user_question', undefined, { raw });
+    await tick(20);
+
+    assert.deepEqual(transport.shown, [], `raw=${JSON.stringify(raw)}`);
+    assert.deepEqual(host.warnings, [], `raw=${JSON.stringify(raw)} 不应产生 warning`);
+    host.dispose();
+  }
+});
+
+test('the exact payload a real session recorded is announced', async () => {
+  // Captured verbatim from this machine's own session log
+  // (~/.dsh/sessions/--D-0Coding-local-llm--/session-e253dbeb/…zstd, seq 1056),
+  // so the fixture cannot drift from what the host really writes: a JSON
+  // *string*, questions nested inside it. The first version of this feature
+  // read `.questions` off that string, found undefined, and stayed silent in
+  // production while a parsed-object fixture kept the tests green.
+  const recorded =
+    '{"questions":[{"id":"restart","question":"现在重启 DSH 让「模型提问时弹通知」生效吗？","header":"生效方式",'
+    + '"options":[{"label":"现在重启（推荐）","description":"重启后新代码生效。"}],"multi_select":false}]}';
+
+  const host = fakeHost();
+  const transport = recordingTransport();
+  apply(host, { settleDelayMs: settle }, transport);
+
+  host.toolCall('ask_user_question', undefined, { raw: recorded });
+  await tick(20);
+
+  assert.equal(transport.shown.length, 1);
+  assert.equal(transport.shown[0].title, '❓ 修复登录崩溃');
+  assert.match(transport.shown[0].body, /现在重启 DSH 让「模型提问时弹通知」生效吗？/);
+  host.dispose();
 });
