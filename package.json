@@ -1,5 +1,5 @@
 {
-  "name": "dsh-notify",
+  "name": "@ztl0001/dsh-notify",
   "version": "0.1.0",
   "description": "Windows notifications when a DeepSeek Harness task finishes — a native toast with the session title, the outcome and a summary of the reply.",
   "description_zh": "DSH 任务完成时在 Windows 通知栏弹出原生通知，带上会话标题、结果状态与回复摘要。",

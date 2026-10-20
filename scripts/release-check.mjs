@@ -52,7 +52,10 @@ if (bundle !== undefined) {
     const patch = readFileSync(patchPath, 'utf8');
     ok(patch.includes(manifest.name), `cordis.patch.yml inserts ${manifest.name}`);
     ok(/-\s*insert:/.test(patch), 'cordis.patch.yml uses an insert list');
-    const nameLine = patch.match(/name:\s*([^\s#]+)/);
+    // An entry name may be YAML-quoted, and a scoped package name (`@scope/name`)
+    // *must* be: `@` is a reserved indicator at the start of a scalar. Compare
+    // the unquoted value, or a correctly quoted entry reads as a mismatch.
+    const nameLine = patch.match(/^[ \t]*name:[ \t]*['"]?([^'"\s#]+)['"]?[ \t]*$/m);
     ok(
       nameLine === null || nameLine[1] === manifest.name,
       'the patched entry name matches the package name',

@@ -16,6 +16,6 @@
 #   2. `debug` written as a sibling of `config:` instead of a child of it
 - insert:
     - id: dsh-notify
-      name: dsh-notify
+      name: '@ztl0001/dsh-notify'
       config:
         debug: true

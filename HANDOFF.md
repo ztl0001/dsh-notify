@@ -191,7 +191,7 @@ Unexpected token ', {'   "name"... is not valid JSON
 # 1) 完全退出 DSH（关窗口不算，托盘也要退）
 # 2) 让插件作为 bundle 进入 profile
 cd C:\Users\Administrator\Documents\deepseek-harness\default-workspace\dsh-notify
-scripts\set-bundle-state.cmd --name dsh-notify --action enable
+scripts\set-bundle-state.cmd --name @ztl0001/dsh-notify --action enable
 # 3) 启动 DSH，随便跑一个任务；任务真正结束时会弹通知
 ```
 

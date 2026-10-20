@@ -3,7 +3,7 @@ rem Enable or disable a bundle in a DSH profile.
 rem
 rem Usage:
 rem   set-bundle-state.cmd --name dsh-custom-instructions --action enable
-rem   set-bundle-state.cmd --name dsh-notify --action disable
+rem   set-bundle-state.cmd --name @ztl0001/dsh-notify --action disable
 rem
 rem Node is not on PATH on a machine that only has the harness installed, so
 rem this finds the copy the harness itself ships. Everything else -- including

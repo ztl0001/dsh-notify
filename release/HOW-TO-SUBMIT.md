@@ -129,8 +129,8 @@ dsh plugin --profile desktop add <仓库地址或本地路径>
 ```sh
 # 1) 完全退出 DSH（关窗口不算，要退出应用）
 # 2) 把这个包作为 bundle 加进 profile
-node scripts/set-bundle-state.mjs --name dsh-notify --action enable
-# Windows 上没有 node 在 PATH 时：scripts\set-bundle-state.cmd --name dsh-notify --action enable
+node scripts/set-bundle-state.mjs --name @ztl0001/dsh-notify --action enable
+# Windows 上没有 node 在 PATH 时：scripts\set-bundle-state.cmd --name @ztl0001/dsh-notify --action enable
 # 3) 启动 DSH，随便跑一个任务；任务真正结束时会弹通知
 ```
 
@@ -153,5 +153,5 @@ node scripts/set-bundle-state.mjs --name dsh-notify --action enable
 撤销：
 
 ```sh
-node scripts/set-bundle-state.mjs --name dsh-notify --action disable
+node scripts/set-bundle-state.mjs --name @ztl0001/dsh-notify --action disable
 ```
