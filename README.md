@@ -27,7 +27,7 @@ DSH 里「一个回合结束」不等于「任务做完了」。开着 **goal �
 ## 安装
 
 ```sh
-dsh plugin --profile <你的 profile> add @ztl0001/dsh-notify
+dsh plugin --profile <你的 profile> add dsh-notify-toast
 ```
 
 在插件市场（Settings → 插件市场）里搜 `dsh-notify` 也能一键安装。
@@ -36,7 +36,7 @@ dsh plugin --profile <你的 profile> add @ztl0001/dsh-notify
 
 ```yaml
 - id: dsh-notify
-  name: '@ztl0001/dsh-notify'
+  name: 'dsh-notify-toast'
   config:
     notifyOn: every-turn
     onlyMainSessions: true
@@ -124,9 +124,9 @@ node scripts/preview-toast.mjs   # 只弹一条，用来看真实排版
 
 ```sh
 # 1) 让它被加载
-node scripts/set-bundle-state.mjs --name @ztl0001/dsh-notify --action enable --link <本仓库路径>
+node scripts/set-bundle-state.mjs --name dsh-notify-toast --action enable --link <本仓库路径>
 # 2) 让它出现在插件列表里、可以开关
-node scripts/register-local-plugin.mjs --name @ztl0001/dsh-notify --dir <本仓库路径>
+node scripts/register-local-plugin.mjs --name dsh-notify-toast --dir <本仓库路径>
 ```
 
 然后启动 DSH，随便跑一个任务。
@@ -134,7 +134,7 @@ node scripts/register-local-plugin.mjs --name @ztl0001/dsh-notify --dir <本仓�
 Windows 上没有 `node` 在 PATH 时用包装脚本（它会自己找 DSH 自带的那份）：
 
 ```bat
-scripts\set-bundle-state.cmd --name @ztl0001/dsh-notify --action enable
+scripts\set-bundle-state.cmd --name dsh-notify-toast --action enable
 ```
 
 撤销：`set-bundle-state.mjs --action disable`，并把 `register-local-plugin.mjs` 写进 `dependencies` 的那一行删掉（它会留备份）。
@@ -176,7 +176,7 @@ scripts\set-bundle-state.cmd --name @ztl0001/dsh-notify --action enable
 
    ```yaml
    - id: dsh-notify
-     name: '@ztl0001/dsh-notify'
+     name: 'dsh-notify-toast'
      config:
        debug: true      # 8 个空格，且必须是空格
    ```

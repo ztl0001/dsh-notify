@@ -36,15 +36,15 @@ echo.
 
 if /I "%ACTION%"=="enable" (
   echo   [1/2] registering the dependency ^(makes it appear in Settings - Plugins^)
-  "%NODE%" "%HERE%\scripts\register-local-plugin.mjs" --name @ztl0001/dsh-notify --dir "%HERE%"
+  "%NODE%" "%HERE%\scripts\register-local-plugin.mjs" --name dsh-notify-toast --dir "%HERE%"
   if errorlevel 1 goto failed
   echo.
   echo   [2/2] enabling the bundle ^(makes the loader run it^)
-  "%NODE%" "%HERE%\scripts\set-bundle-state.mjs" --name @ztl0001/dsh-notify --action enable --link "%HERE%"
+  "%NODE%" "%HERE%\scripts\set-bundle-state.mjs" --name dsh-notify-toast --action enable --link "%HERE%"
   if errorlevel 1 goto failed
 ) else (
   echo   disabling the bundle
-  "%NODE%" "%HERE%\scripts\set-bundle-state.mjs" --name @ztl0001/dsh-notify --action disable
+  "%NODE%" "%HERE%\scripts\set-bundle-state.mjs" --name dsh-notify-toast --action disable
   if errorlevel 1 goto failed
   echo.
   echo   NOTE: the dependency row in profile package.json is left in place.
